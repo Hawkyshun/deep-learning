@@ -3,15 +3,14 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from tensorflow.keras.models import Sequential, Model, load_model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, GlobalAveragePooling2D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
-from tensorflow.keras.applications import ResNet50
 
 # Verilerin bulunduğu dizinler
-train_dir = '/Users/furkanerdogan/Projects/deep-learning/Fruits/fruits/train'
-test_dir = '/Users/furkanerdogan/Projects/deep-learning/Fruits/fruits/test'
+train_dir = 'C:/Users/fatih/Downloads/fruits/train'
+test_dir = 'C:/Users/fatih/Downloads/fruits/test'
 
 # Görüntü boyutu
 IMG_SIZE = 100
@@ -20,11 +19,11 @@ NUM_CLASSES = 10
 # Veri artırma işlemleri
 datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=20,       
-    width_shift_range=0.2,   
-    height_shift_range=0.2,  
-    horizontal_flip=True,    
-    zoom_range=0.15          
+    rotation_range=20,       # Görüntüleri döndürme
+    width_shift_range=0.2,   # Genişlik kaydırma
+    height_shift_range=0.2,  # Yükseklik kaydırma
+    horizontal_flip=True,    # Yatay çevirme
+    zoom_range=0.15          # Yakınlaştırma
 )
 
 train_generator = datagen.flow_from_directory(
@@ -44,16 +43,17 @@ test_generator = test_datagen.flow_from_directory(
     shuffle=False
 )
 
-# Transfer Learning (ResNet50'ye ince ayar yaparak)
-resnet_base = ResNet50(weights='imagenet', include_top=False, input_shape=(IMG_SIZE, IMG_SIZE, 3))
-
-# Katmanları dondurma
-for layer in resnet_base.layers:
-    layer.trainable = False
-
+# CNN Modeli
 model = Sequential([
-    resnet_base,
-    GlobalAveragePooling2D(),
+    Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 3)),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Conv2D(128, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Conv2D(256, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Flatten(),
     Dense(1024, activation='relu'),
     Dropout(0.5),
     Dense(NUM_CLASSES, activation='softmax')
@@ -68,9 +68,6 @@ history = model.fit(
     epochs=20,
     validation_data=test_generator
 )
-
-# Modeli .h5 formatında kaydetme
-model.save("model_fruit_classifier_resnet.h5")
 
 # Eğitim ve doğrulama kayıp ve doğruluk grafikleri
 plt.plot(history.history['accuracy'], label='Eğitim Doğruluğu')
@@ -93,10 +90,6 @@ plt.show()
 y_pred = model.predict(test_generator)
 y_pred_classes = np.argmax(y_pred, axis=1)
 y_true = test_generator.classes
-
-# Özellik çıkarımı (Feature Extraction)
-feature_extractor = Model(inputs=model.input, outputs=model.get_layer("dense").output)
-features = feature_extractor.predict(test_generator)
 
 # Confusion matrix
 conf_matrix = confusion_matrix(y_true, y_pred_classes)
